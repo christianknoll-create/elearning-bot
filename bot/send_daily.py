@@ -22,13 +22,7 @@ FRAGEN_PRO_TAG  = 3
 # ── Mitarbeiterliste ─────────────────────────────────────────────
 # Slack User ID: In Slack → Profil anzeigen → (...) → Member-ID kopieren
 MITARBEITER = [
-    {"slack_id": "U061EJVA4LX", "ma_id": "MA-001", "name": "Marion"},
-    {"slack_id": "U061XJCHV9A", "ma_id": "MA-002", "name": "Maren"},
-    {"slack_id": "U07342Y9H6K", "ma_id": "MA-003", "name": "Marvin"},
-    {"slack_id": "U08UZ6K3PU6", "ma_id": "MA-004", "name": "Vithu"},
-    {"slack_id": "U0A8Y841QKV", "ma_id": "MA-005", "name": "Meena"},
-    {"slack_id": "U0A4Q2D1KNC", "ma_id": "MA-006", "name": "Marcel"},
-    {"slack_id": "U08H4Q9GK7S", "ma_id": "MA-007", "name": "Sara"},
+    {"slack_id": "U0608A09ESZ", "ma_id": "MA-008", "name": "Christian"},
     # weitere Mitarbeiter hier hinzufügen...
 ]
 
