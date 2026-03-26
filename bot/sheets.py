@@ -34,7 +34,7 @@ def get_alle_fragen():
     """Alle aktiven Fragen laden."""
     book = get_sheets_client()
     sheet = book.worksheet(SHEET_FRAGEN)
-    records = sheet.get_all_records(default_blank="", numericise_ignore=["all"])
+    records = sheet.get_all_records()
     return [r for r in records if r.get("Status") == "Aktiv"]
 
 
