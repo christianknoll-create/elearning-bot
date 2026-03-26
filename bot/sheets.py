@@ -25,6 +25,8 @@ def get_sheets_client():
     creds_dict = json.loads(creds_json)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     gc = gspread.authorize(creds)
+    gc = gspread.authorize(creds)
+    print(f"ID: '{os.environ.get('SPREADSHEET_ID')}'")
     return gc.open_by_key(os.environ.get("SPREADSHEET_ID"))
 
 
