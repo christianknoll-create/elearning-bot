@@ -40,6 +40,7 @@ def handle_events():
     text    = event.get("text", "").strip()
 
     # Nur im Admin-Channel reagieren
+    print(f"DEBUG channel: '{channel}' | ADMIN: '{ADMIN_CHANNEL_ID}' | text: '{text}'")
     if channel != ADMIN_CHANNEL_ID:
         return jsonify({"status": "ignored"})
 
