@@ -35,7 +35,7 @@ def get_alle_fragen():
     book = get_sheets_client()
     sheet = book.worksheet(SHEET_FRAGEN)
     records = sheet.get_all_records(expected_headers=[
-        "Frage-ID", "Status", "Themenbereich", "Schwierigkeits-\ngrad",
+        "Frage-ID", "Status", "Themenbereich", "Schwierigkeitsgrad",
         "Fragestellung", "Antwort A", "Antwort B", "Antwort C", "Antwort D",
         "Korrekte Antwort", "Erklärung A", "Erklärung B", "Erklärung C", "Erklärung D",
         "Confluence-Quelle", "Erstellt am", "Geprüft"
