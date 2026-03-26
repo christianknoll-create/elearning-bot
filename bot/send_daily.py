@@ -23,6 +23,7 @@ FRAGEN_PRO_TAG  = 3
 # Slack User ID: In Slack → Profil anzeigen → (...) → Member-ID kopieren
 MITARBEITER = [
     {"slack_id": "U0608A09ESZ", "ma_id": "MA-008", "name": "Christian"},
+    {"slack_id": "U061XJCHV9A", "ma_id": "MA-002", "name": "Maren"},
     # weitere Mitarbeiter hier hinzufügen...
 ]
 
