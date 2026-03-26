@@ -8,9 +8,8 @@ from datetime import datetime, date
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-SPREADSHEET_NAME = "elearning_google_drive"
-SHEET_FRAGEN     = "📚 Fragen-Bank"
-SHEET_TRACKING   = "📊 Mitarbeiter-Tracking"
+SHEET_FRAGEN   = "📚 Fragen-Bank"
+SHEET_TRACKING = "📊 Mitarbeiter-Tracking"
 
 
 def get_sheets_client():
@@ -19,7 +18,6 @@ def get_sheets_client():
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
-    # Credentials kommen aus der Umgebungsvariable (GitHub Secret / Railway Variable)
     creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     if not creds_json:
         raise ValueError("GOOGLE_CREDENTIALS_JSON nicht gesetzt!")
@@ -27,20 +25,20 @@ def get_sheets_client():
     creds_dict = json.loads(creds_json)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     gc = gspread.authorize(creds)
-    return gc.open(SPREADSHEET_NAME)
+    return gc.open_by_key(os.environ.get("SPREADSHEET_ID"))
 
 
 def get_alle_fragen():
-    """Alle aktiven und geprüften Fragen laden."""
+    """Alle aktiven Fragen laden."""
     book = get_sheets_client()
     sheet = book.worksheet(SHEET_FRAGEN)
     records = sheet.get_all_records(expected_headers=[
-    "Frage-ID", "Status", "Themenbereich", "Schwierigkeitsgrad",
-    "Fragestellung", "Antwort A", "Antwort B", "Antwort C", "Antwort D",
-    "Korrekte Antwort", "Erklärung A", "Erklärung B", "Erklärung C", "Erklärung D",
-    "Confluence-Quelle", "Erstellt am", "Geprüft"
+        "Frage-ID", "Status", "Themenbereich", "Schwierigkeits-\ngrad",
+        "Fragestellung", "Antwort A", "Antwort B", "Antwort C", "Antwort D",
+        "Korrekte Antwort", "Erklärung A", "Erklärung B", "Erklärung C", "Erklärung D",
+        "Confluence-Quelle", "Erstellt am", "Geprüft"
     ])
-    return [r for r in records if r.get("Status") == "Aktiv" and r.get("Geprüft") == "Ja"]
+    return [r for r in records if r.get("Status") == "Aktiv"]
 
 
 def get_mitarbeiter_fehler(mitarbeiter_id):
