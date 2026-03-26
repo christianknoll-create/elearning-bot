@@ -6,14 +6,11 @@ import json, time
 
 
 def baue_frage_block(frage, frage_nr, gesamt=3):
-    """Eine Frage als Slack Block Kit Nachricht bauen."""
-    fid       = frage.get("Frage-ID", "")
-    fragetext = frage.get("Fragestellung", "")
-    thema     = frage.get("Themenbereich", "")
-    schwierig = frage.get("Schwierigkeitsgrad", "")
-    korrekt   = frage.get("Korrekte\nAntwort", frage.get("Korrekte Antwort", ""))
-    erklaerung = frage.get("Erklärung (bei Fehler)", "")
-
+    fid        = frage.get("Frage-ID", "")
+    fragetext  = frage.get("Fragestellung", "")
+    thema      = frage.get("Themenbereich", "")
+    schwierig  = frage.get("Schwierigkeitsgrad", "")
+    korrekt    = frage.get("Korrekte Antwort", "")
     emoji_schwierig = {"Einfach": "🟢", "Mittel": "🟡", "Schwer": "🔴"}.get(schwierig, "⚪")
 
     blocks = [
@@ -33,24 +30,31 @@ def baue_frage_block(frage, frage_nr, gesamt=3):
         {"type": "divider"}
     ]
 
-    # 4 Antwort-Buttons
-    buttons = []
+    # Jede Antwort als eigene Zeile mit Button rechts — besser lesbar bei langen Texten
     for key in ["A", "B", "C", "D"]:
-        text = frage.get(f"Antwort {key}", "")
-        buttons.append({
-            "type": "button",
-            "text": {"type": "plain_text", "text": f"{key}:  {text}", "emoji": True},
-            "value": json.dumps({
-                "frage_id": fid,
-                "gewaehlt": key,
-                "korrekt": korrekt,
-                "erklaerung": erklaerung,
-                "thema": thema,
-                "schwierigkeit": schwierig,
-                "ts": int(time.time())
-            }),
-            "action_id": f"antwort_{fid}_{key}"
+        antworttext = frage.get(f"Antwort {key}", "")
+        erklaerung  = frage.get(f"Erklärung {key}", "")
+
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*{key}*  –  {antworttext}"
+            },
+            "accessory": {
+                "type": "button",
+                "text": {"type": "plain_text", "text": f"➤ {key}", "emoji": True},
+                "value": json.dumps({
+                    "frage_id":   fid,
+                    "gewaehlt":   key,
+                    "korrekt":    korrekt,
+                    "erklaerung": erklaerung,
+                    "thema":      thema,
+                    "schwierigkeit": schwierig,
+                    "ts": int(time.time())
+                }),
+                "action_id": f"antwort_{fid}_{key}"
+            }
         })
 
-    blocks.append({"type": "actions", "elements": buttons})
     return blocks
