@@ -1,7 +1,5 @@
 """
 webhook.py — läuft dauerhaft auf Railway.
-Empfängt Button-Klicks und Admin-Befehle von Slack.
-Admin-Befehle nur im privaten Admin-Channel.
 """
 
 import os, json, time
@@ -25,7 +23,6 @@ def health():
 @app.route("/slack/events", methods=["POST"])
 def handle_events():
     data = request.json
-    print(f"EVENT EMPFANGEN: {json.dumps(data)[:300]}")
 
     # Slack URL Verification
     if data.get("type") == "url_verification":
@@ -33,34 +30,38 @@ def handle_events():
 
     event = data.get("event", {})
 
-# Nur Nachrichten verarbeiten, Bot-Nachrichten ignorieren
+    # Nur echte Nachrichten – Bot-Nachrichten und Subtypes ignorieren
     if event.get("type") != "message":
         return jsonify({"status": "ignored"})
-    if event.get("subtype") or event.get("bot_id"):
+    if event.get("bot_id") or event.get("subtype"):
         return jsonify({"status": "ignored"})
+
     channel = event.get("channel", "")
     text    = event.get("text", "").strip()
 
-    # Nur im Admin-Channel reagieren
     print(f"DEBUG channel: '{channel}' | ADMIN: '{ADMIN_CHANNEL_ID}' | text: '{text}'")
+
+    # Nur im Admin-Channel reagieren
     if channel != ADMIN_CHANNEL_ID:
         return jsonify({"status": "ignored"})
 
-    # Befehl: /add SLACK_ID MA-ID Name
-    if text.startswith("/add "):
-        parts = text[5:].split(" ", 2)
+    # Befehle — mit Leerzeichen vor / tippen z.B. " add ..."
+    # Slack interpretiert /befehl als Slash-Command, daher Leerzeichen davor
+    cmd = text.lstrip()
+
+    if cmd.startswith("add "):
+        parts = cmd[4:].split(" ", 2)
         if len(parts) < 3:
             client.chat_postMessage(channel=channel,
-                text="❌ Format: `/add SLACK_ID MA-ID Name`\nBeispiel: `/add U012AB3CD MA-010 Max Mustermann`")
+                text="❌ Format: `add SLACK_ID MA-ID Name`\nBeispiel: `add U012AB3CD MA-010 Max Mustermann`")
         else:
             slack_id, ma_id, name = parts
             add_mitarbeiter(slack_id, ma_id, name)
             client.chat_postMessage(channel=channel,
                 text=f"✅ *{name}* wurde hinzugefügt!\nSlack-ID: `{slack_id}` | MA-ID: `{ma_id}`")
 
-    # Befehl: /remove SLACK_ID
-    elif text.startswith("/remove "):
-        slack_id = text[8:].strip()
+    elif cmd.startswith("remove "):
+        slack_id = cmd[7:].strip()
         name = remove_mitarbeiter(slack_id)
         if name:
             client.chat_postMessage(channel=channel,
@@ -69,40 +70,33 @@ def handle_events():
             client.chat_postMessage(channel=channel,
                 text=f"❌ Kein Mitarbeiter mit Slack-ID `{slack_id}` gefunden.")
 
-    # Befehl: /liste
-    elif text.startswith("/liste"):
+    elif cmd == "liste":
         mitarbeiter = get_mitarbeiter_liste()
         if not mitarbeiter:
-            client.chat_postMessage(channel=channel,
-                text="📋 Keine Mitarbeiter eingetragen.")
+            client.chat_postMessage(channel=channel, text="📋 Keine Mitarbeiter eingetragen.")
         else:
             zeilen = [
-                f"*{i+1}.* {m['Name']} | `{m['Slack-ID']}` | {m['MA-ID']} | {'✅ Aktiv' if m.get('Aktiv') == 'Ja' else '❌ Inaktiv'}"
+                f"*{i+1}.* {m['Name']} | `{m['Slack-ID']}` | {m['MA-ID']} | {'✅' if m.get('Aktiv') == 'Ja' else '❌'}"
                 for i, m in enumerate(mitarbeiter)
             ]
             client.chat_postMessage(channel=channel,
-                text=f"📋 *Mitarbeiterliste ({len(mitarbeiter)} Personen):*\n\n" + "\n".join(zeilen))
+                text=f"📋 *Mitarbeiterliste ({len(mitarbeiter)}):*\n\n" + "\n".join(zeilen))
 
-    # Befehl: /hilfe
-    elif text.startswith("/hilfe") or text.startswith("/help"):
+    elif cmd == "hilfe":
         client.chat_postMessage(channel=channel, text=(
-            "*eLearning Bot Admin-Befehle:*\n\n"
-            "`/add SLACK_ID MA-ID Name` — Mitarbeiter hinzufügen\n"
-            "`/remove SLACK_ID` — Mitarbeiter deaktivieren\n"
-            "`/liste` — Alle Mitarbeiter anzeigen\n\n"
-            "*Slack-ID herausfinden:* Profil anzeigen → (...) → Member-ID kopieren"
+            "*eLearning Bot Admin-Befehle:*\n"
+            "_(kein / davor — einfach so tippen)_\n\n"
+            "`add SLACK_ID MA-ID Name` — Mitarbeiter hinzufügen\n"
+            "`remove SLACK_ID` — Mitarbeiter deaktivieren\n"
+            "`liste` — Alle Mitarbeiter anzeigen\n\n"
+            "*Slack-ID:* Profil → (...) → Member-ID kopieren"
         ))
-
-    else:
-        client.chat_postMessage(channel=channel,
-            text="❓ Unbekannter Befehl. Schreibe `/hilfe` für eine Übersicht.")
 
     return jsonify({"status": "ok"})
 
 
 @app.route("/slack/interaktiv", methods=["POST"])
 def handle_klick():
-    """Antwort-Button wurde geklickt."""
     payload = json.loads(request.form.get("payload", "{}"))
 
     if payload.get("type") != "block_actions":
