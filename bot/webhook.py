@@ -77,6 +77,19 @@ def handle_events():
             client.chat_postMessage(channel=channel,
                 text=f"❌ Kein Mitarbeiter mit Slack-ID `{slack_id}` gefunden.")
 
+    # Befehl: /liste
+    elif text.startswith("/liste"):
+        from sheets import get_mitarbeiter_liste
+        mitarbeiter = get_mitarbeiter_liste()
+        if not mitarbeiter:
+            client.chat_postMessage(channel=channel,
+                text="📋 Keine Mitarbeiter eingetragen.")
+        else:
+            zeilen = [f"*{i+1}.* {m['Name']} | `{m['Slack-ID']}` | {m['MA-ID']} | {'✅ Aktiv' if m.get('Aktiv') == 'Ja' else '❌ Inaktiv'}"
+                      for i, m in enumerate(mitarbeiter)]
+            client.chat_postMessage(channel=channel,
+                text=f"📋 *Mitarbeiterliste ({len(mitarbeiter)} Personen):*\n\n" + "\n".join(zeilen))
+            
     # Befehl: /hilfe
     elif text.startswith("/hilfe") or text.startswith("/help"):
         client.chat_postMessage(channel=channel, text=(
