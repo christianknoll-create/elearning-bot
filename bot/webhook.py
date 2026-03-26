@@ -1,15 +1,17 @@
 """
 webhook.py — läuft dauerhaft auf Railway.
-Empfängt Button-Klicks von Slack und sendet Feedback.
+Empfängt Button-Klicks und Admin-Befehle von Slack.
 """
 
 import os, json, time
 from flask import Flask, request, jsonify
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from sheets import log_antwort
+from sheets import log_antwort, add_mitarbeiter, remove_mitarbeiter
 
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
+ADMIN_SLACK_ID  = os.environ.get("ADMIN_SLACK_ID", "")  # Nur du kannst Mitarbeiter verwalten
+
 client = WebClient(token=SLACK_BOT_TOKEN)
 app = Flask(__name__)
 
@@ -19,8 +21,81 @@ def health():
     return "eLearning Bot läuft ✅", 200
 
 
+@app.route("/slack/events", methods=["POST"])
+def handle_events():
+    """
+    Empfängt Slack Event API Nachrichten (DMs an den Bot).
+    Admin-Befehle:
+      /add U012AB3CD MA-010 Max Mustermann   → Mitarbeiter hinzufügen
+      /remove U012AB3CD                       → Mitarbeiter deaktivieren
+      /liste                                  → Alle Mitarbeiter anzeigen
+    """
+    data = request.json
+
+    # Slack URL Verification
+    if data.get("type") == "url_verification":
+        return jsonify({"challenge": data["challenge"]})
+
+    event = data.get("event", {})
+
+    # Nur DMs verarbeiten
+    if event.get("type") != "message" or event.get("channel_type") != "im":
+        return jsonify({"status": "ignored"})
+
+    # Nur vom Admin
+    sender = event.get("user", "")
+    if sender != ADMIN_SLACK_ID:
+        client.chat_postMessage(
+            channel=sender,
+            text="⛔ Du bist nicht berechtigt, diesen Bot zu verwalten."
+        )
+        return jsonify({"status": "unauthorized"})
+
+    text = event.get("text", "").strip()
+    channel = event.get("channel")
+
+    # Befehl: /add SLACK_ID MA-ID Name
+    if text.startswith("/add "):
+        parts = text[5:].split(" ", 2)
+        if len(parts) < 3:
+            client.chat_postMessage(channel=channel,
+                text="❌ Format: `/add SLACK_ID MA-ID Name`\nBeispiel: `/add U012AB3CD MA-010 Max Mustermann`")
+        else:
+            slack_id, ma_id, name = parts
+            add_mitarbeiter(slack_id, ma_id, name)
+            client.chat_postMessage(channel=channel,
+                text=f"✅ *{name}* wurde hinzugefügt!\nSlack-ID: `{slack_id}` | MA-ID: `{ma_id}`")
+
+    # Befehl: /remove SLACK_ID
+    elif text.startswith("/remove "):
+        slack_id = text[8:].strip()
+        name = remove_mitarbeiter(slack_id)
+        if name:
+            client.chat_postMessage(channel=channel,
+                text=f"✅ *{name}* wurde deaktiviert.")
+        else:
+            client.chat_postMessage(channel=channel,
+                text=f"❌ Kein Mitarbeiter mit Slack-ID `{slack_id}` gefunden.")
+
+    # Befehl: /hilfe
+    elif text.startswith("/hilfe") or text.startswith("/help"):
+        client.chat_postMessage(channel=channel, text=(
+            "*eLearning Bot Admin-Befehle:*\n\n"
+            "`/add SLACK_ID MA-ID Name` — Mitarbeiter hinzufügen\n"
+            "`/remove SLACK_ID` — Mitarbeiter deaktivieren\n\n"
+            "*Slack-ID herausfinden:* Profil anzeigen → (...) → Member-ID kopieren"
+        ))
+
+    else:
+        client.chat_postMessage(channel=channel,
+            text="❓ Unbekannter Befehl. Schreibe `/hilfe` für eine Übersicht.")
+
+    return jsonify({"status": "ok"})
+
+
 @app.route("/slack/interaktiv", methods=["POST"])
 def handle_klick():
+    """Antwort-Button wurde geklickt."""
     payload = json.loads(request.form.get("payload", "{}"))
 
     if payload.get("type") != "block_actions":
@@ -33,12 +108,11 @@ def handle_klick():
     channel_id = payload["container"]["channel_id"]
     message_ts = payload["container"]["message_ts"]
 
-    # Daten aus dem Button lesen
     daten         = json.loads(aktion["value"])
     frage_id      = daten["frage_id"]
     gewaehlt      = daten["gewaehlt"]
     korrekt       = daten["korrekt"]
-    erklaerung    = daten.get("erklaerung", "")
+    erklaerung    = daten.get("erklaerung", "").replace("— (korrekt)", "").strip()
     thema         = daten["thema"]
     schwierigkeit = daten["schwierigkeit"]
     antwortzeit   = int(time.time()) - daten.get("ts", int(time.time()))
@@ -48,14 +122,14 @@ def handle_klick():
     if richtig:
         feedback = (
             f"✅ *Richtig!* Antwort *{gewaehlt}* ist korrekt. 🎉\n\n"
-            f"💡 *Zur Erinnerung:* {erklaerung}" if erklaerung and erklaerung != "— (korrekt)"
-            else f"✅ *Richtig!* Antwort *{gewaehlt}* ist korrekt. 🎉"
+            f"💡 *Zur Erinnerung:* {erklaerung}"
         )
     else:
         feedback = (
             f"❌ *Leider falsch.* Du hast *{gewaehlt}* gewählt, "
             f"richtig wäre *{korrekt}* gewesen.\n\n"
-            f"💡 *Erklärung:* {erklaerung}"
+            f"💡 *Erklärung:* {erklaerung}\n\n"
+            f"🔁 _Diese Frage wird dir morgen nochmal gestellt._"
         )
 
     try:
