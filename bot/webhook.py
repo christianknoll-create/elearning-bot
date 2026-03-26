@@ -33,10 +33,11 @@ def handle_events():
 
     event = data.get("event", {})
 
-    # Nur Nachrichten verarbeiten
-    if event.get("type") != "message" or event.get("subtype"):
+# Nur Nachrichten verarbeiten, Bot-Nachrichten ignorieren
+    if event.get("type") != "message":
         return jsonify({"status": "ignored"})
-
+    if event.get("subtype") or event.get("bot_id"):
+        return jsonify({"status": "ignored"})
     channel = event.get("channel", "")
     text    = event.get("text", "").strip()
 
