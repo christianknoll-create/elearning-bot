@@ -25,6 +25,7 @@ def health():
 @app.route("/slack/events", methods=["POST"])
 def handle_events():
     data = request.json
+    print(f"EVENT EMPFANGEN: {json.dumps(data)[:300]}")
 
     # Slack URL Verification
     if data.get("type") == "url_verification":
