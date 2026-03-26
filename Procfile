@@ -1,1 +1,1 @@
-web: python bot/webhook.py
+web: cd bot && python webhook.py
