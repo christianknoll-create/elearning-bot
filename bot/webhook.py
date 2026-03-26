@@ -1,12 +1,6 @@
 """
-webhook.py
-──────────
-Läuft dauerhaft auf Railway.
+webhook.py — läuft dauerhaft auf Railway.
 Empfängt Button-Klicks von Slack und sendet Feedback.
-
-Umgebungsvariablen (in Railway → Variables):
-  SLACK_BOT_TOKEN        → xoxb-...
-  GOOGLE_CREDENTIALS_JSON → { ... komplett JSON ... }
 """
 
 import os, json, time
@@ -22,13 +16,11 @@ app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def health():
-    """Railway Health Check."""
     return "eLearning Bot läuft ✅", 200
 
 
 @app.route("/slack/interaktiv", methods=["POST"])
 def handle_klick():
-    """Wird aufgerufen wenn ein Mitarbeiter einen Antwort-Button klickt."""
     payload = json.loads(request.form.get("payload", "{}"))
 
     if payload.get("type") != "block_actions":
@@ -46,15 +38,19 @@ def handle_klick():
     frage_id      = daten["frage_id"]
     gewaehlt      = daten["gewaehlt"]
     korrekt       = daten["korrekt"]
-    erklaerung    = daten["erklaerung"]
+    erklaerung    = daten.get("erklaerung", "")
     thema         = daten["thema"]
     schwierigkeit = daten["schwierigkeit"]
     antwortzeit   = int(time.time()) - daten.get("ts", int(time.time()))
 
-    # Feedback bauen
     richtig = gewaehlt == korrekt
+
     if richtig:
-        feedback = f"✅ *Richtig!* Antwort *{gewaehlt}* ist korrekt. 🎉"
+        feedback = (
+            f"✅ *Richtig!* Antwort *{gewaehlt}* ist korrekt. 🎉\n\n"
+            f"💡 *Zur Erinnerung:* {erklaerung}" if erklaerung and erklaerung != "— (korrekt)"
+            else f"✅ *Richtig!* Antwort *{gewaehlt}* ist korrekt. 🎉"
+        )
     else:
         feedback = (
             f"❌ *Leider falsch.* Du hast *{gewaehlt}* gewählt, "
@@ -62,7 +58,6 @@ def handle_klick():
             f"💡 *Erklärung:* {erklaerung}"
         )
 
-    # Feedback als Thread-Antwort senden
     try:
         client.chat_postMessage(
             channel=channel_id,
@@ -77,7 +72,6 @@ def handle_klick():
     except SlackApiError as e:
         print(f"❌ Feedback-Fehler: {e.response['error']}")
 
-    # In Google Sheets loggen
     log_antwort(slack_uid, user_name, frage_id, thema, schwierigkeit,
                 gewaehlt, korrekt, antwortzeit)
 
