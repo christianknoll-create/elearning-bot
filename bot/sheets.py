@@ -34,7 +34,12 @@ def get_alle_fragen():
     """Alle aktiven und geprüften Fragen laden."""
     book = get_sheets_client()
     sheet = book.worksheet(SHEET_FRAGEN)
-    records = sheet.get_all_records()
+    records = sheet.get_all_records(expected_headers=[
+    "Frage-ID", "Status", "Themenbereich", "Schwierigkeitsgrad",
+    "Fragestellung", "Antwort A", "Antwort B", "Antwort C", "Antwort D",
+    "Korrekte Antwort", "Erklärung A", "Erklärung B", "Erklärung C", "Erklärung D",
+    "Confluence-Quelle", "Erstellt am", "Geprüft"
+    ])
     return [r for r in records if r.get("Status") == "Aktiv" and r.get("Geprüft") == "Ja"]
 
 
