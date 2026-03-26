@@ -2,32 +2,17 @@
 send_daily.py
 ─────────────
 Wird von GitHub Actions täglich um 09:00 Uhr gestartet.
-Sendet 3 Fragen per Slack DM an jeden Mitarbeiter.
-
-Umgebungsvariablen (in GitHub → Settings → Secrets):
-  SLACK_BOT_TOKEN        → xoxb-...
-  GOOGLE_CREDENTIALS_JSON → { ... komplett JSON ... }
+Mitarbeiterliste kommt aus Google Sheets (👥 Mitarbeiter Tab).
 """
 
 import os, time
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from sheets import get_alle_fragen, waehle_fragen
+from sheets import get_alle_fragen, waehle_fragen, get_mitarbeiter_liste
 from messages import baue_frage_block
 
-# ── Konfiguration ────────────────────────────────────────────────
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 FRAGEN_PRO_TAG  = 3
-
-# ── Mitarbeiterliste ─────────────────────────────────────────────
-# Slack User ID: In Slack → Profil anzeigen → (...) → Member-ID kopieren
-MITARBEITER = [
-    {"slack_id": "U0608A09ESZ", "ma_id": "MA-008", "name": "Christian"},
-    {"slack_id": "U061XJCHV9A", "ma_id": "MA-002", "name": "Maren"},
-    # weitere Mitarbeiter hier hinzufügen...
-]
-
-# ── Slack Client ─────────────────────────────────────────────────
 client = WebClient(token=SLACK_BOT_TOKEN)
 
 
@@ -39,7 +24,6 @@ def sende_fragen(slack_user_id, mitarbeiter_id, name):
 
     ausgewaehlte = waehle_fragen(alle_fragen, mitarbeiter_id, FRAGEN_PRO_TAG)
 
-    # Begrüßung + alle Fragen in einer Nachricht
     blocks = [
         {
             "type": "section",
@@ -68,8 +52,16 @@ def sende_fragen(slack_user_id, mitarbeiter_id, name):
 
 
 if __name__ == "__main__":
-    print(f"🚀 Täglicher Versand an {len(MITARBEITER)} Mitarbeiter...")
-    for ma in MITARBEITER:
-        sende_fragen(ma["slack_id"], ma["ma_id"], ma["name"])
-        time.sleep(1)   # Slack Rate Limit
+    # Mitarbeiterliste aus Google Sheets laden
+    mitarbeiter = get_mitarbeiter_liste()
+
+    if not mitarbeiter:
+        print("⚠️  Keine Mitarbeiter in Google Sheets gefunden!")
+        print("   Tipp: Tab '👥 Mitarbeiter' anlegen mit Spalten: Slack-ID, MA-ID, Name, Aktiv")
+        exit(1)
+
+    print(f"🚀 Täglicher Versand an {len(mitarbeiter)} Mitarbeiter...")
+    for ma in mitarbeiter:
+        sende_fragen(ma["Slack-ID"], ma["MA-ID"], ma["Name"])
+        time.sleep(1)
     print("✅ Fertig!")
