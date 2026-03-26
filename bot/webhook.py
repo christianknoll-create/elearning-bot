@@ -1,16 +1,17 @@
 """
 webhook.py — läuft dauerhaft auf Railway.
 Empfängt Button-Klicks und Admin-Befehle von Slack.
+Admin-Befehle nur im privaten Admin-Channel.
 """
 
 import os, json, time
 from flask import Flask, request, jsonify
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from sheets import log_antwort, add_mitarbeiter, remove_mitarbeiter
+from sheets import log_antwort, add_mitarbeiter, remove_mitarbeiter, get_mitarbeiter_liste
 
-SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
-ADMIN_SLACK_ID  = os.environ.get("ADMIN_SLACK_ID", "")  # Nur du kannst Mitarbeiter verwalten
+SLACK_BOT_TOKEN  = os.environ["SLACK_BOT_TOKEN"]
+ADMIN_CHANNEL_ID = os.environ.get("ADMIN_CHANNEL_ID", "")
 
 client = WebClient(token=SLACK_BOT_TOKEN)
 app = Flask(__name__)
@@ -23,13 +24,6 @@ def health():
 
 @app.route("/slack/events", methods=["POST"])
 def handle_events():
-    """
-    Empfängt Slack Event API Nachrichten (DMs an den Bot).
-    Admin-Befehle:
-      /add U012AB3CD MA-010 Max Mustermann   → Mitarbeiter hinzufügen
-      /remove U012AB3CD                       → Mitarbeiter deaktivieren
-      /liste                                  → Alle Mitarbeiter anzeigen
-    """
     data = request.json
 
     # Slack URL Verification
@@ -38,21 +32,16 @@ def handle_events():
 
     event = data.get("event", {})
 
-    # Nur DMs verarbeiten
-    if event.get("type") != "message" or event.get("channel_type") != "im":
+    # Nur Nachrichten verarbeiten
+    if event.get("type") != "message" or event.get("subtype"):
         return jsonify({"status": "ignored"})
 
-    # Nur vom Admin
-    sender = event.get("user", "")
-    if sender != ADMIN_SLACK_ID:
-        client.chat_postMessage(
-            channel=sender,
-            text="⛔ Du bist nicht berechtigt, diesen Bot zu verwalten."
-        )
-        return jsonify({"status": "unauthorized"})
+    channel = event.get("channel", "")
+    text    = event.get("text", "").strip()
 
-    text = event.get("text", "").strip()
-    channel = event.get("channel")
+    # Nur im Admin-Channel reagieren
+    if channel != ADMIN_CHANNEL_ID:
+        return jsonify({"status": "ignored"})
 
     # Befehl: /add SLACK_ID MA-ID Name
     if text.startswith("/add "):
@@ -79,23 +68,25 @@ def handle_events():
 
     # Befehl: /liste
     elif text.startswith("/liste"):
-        from sheets import get_mitarbeiter_liste
         mitarbeiter = get_mitarbeiter_liste()
         if not mitarbeiter:
             client.chat_postMessage(channel=channel,
                 text="📋 Keine Mitarbeiter eingetragen.")
         else:
-            zeilen = [f"*{i+1}.* {m['Name']} | `{m['Slack-ID']}` | {m['MA-ID']} | {'✅ Aktiv' if m.get('Aktiv') == 'Ja' else '❌ Inaktiv'}"
-                      for i, m in enumerate(mitarbeiter)]
+            zeilen = [
+                f"*{i+1}.* {m['Name']} | `{m['Slack-ID']}` | {m['MA-ID']} | {'✅ Aktiv' if m.get('Aktiv') == 'Ja' else '❌ Inaktiv'}"
+                for i, m in enumerate(mitarbeiter)
+            ]
             client.chat_postMessage(channel=channel,
                 text=f"📋 *Mitarbeiterliste ({len(mitarbeiter)} Personen):*\n\n" + "\n".join(zeilen))
-            
+
     # Befehl: /hilfe
     elif text.startswith("/hilfe") or text.startswith("/help"):
         client.chat_postMessage(channel=channel, text=(
             "*eLearning Bot Admin-Befehle:*\n\n"
             "`/add SLACK_ID MA-ID Name` — Mitarbeiter hinzufügen\n"
-            "`/remove SLACK_ID` — Mitarbeiter deaktivieren\n\n"
+            "`/remove SLACK_ID` — Mitarbeiter deaktivieren\n"
+            "`/liste` — Alle Mitarbeiter anzeigen\n\n"
             "*Slack-ID herausfinden:* Profil anzeigen → (...) → Member-ID kopieren"
         ))
 
